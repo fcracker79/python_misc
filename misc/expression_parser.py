@@ -1,9 +1,12 @@
+import abc
 import ast
 
 import logging
 import typing
 from functools import wraps
 
+
+_DEFAULT_CONTEXT_NAME = 'context'
 
 class UnparsableException(Exception):
     def __init__(self, node: ast.AST, *a):
@@ -22,13 +25,24 @@ def _log(fun):
     return _inner
 
 
-class _ExpressionVisitor(ast.NodeVisitor):
+class ValueVisitor(ast.NodeVisitor, metaclass=abc.ABCMeta):
+    @property
+    @abc.abstractmethod
+    def value(self):
+        pass  # pragma: no cover
+
+
+class _ExpressionVisitor(ValueVisitor):
     def __init__(
             self, context: typing.Dict,
-            context_name: str='context'):
+            context_name: str=_DEFAULT_CONTEXT_NAME):
         self._stack = []
         self._context = context
         self._context_name = context_name
+        self._known_functions = {}
+
+    def add_known_function(self, name: str, fun: typing.Callable) -> None:
+        self._known_functions[name] = fun
 
     def generic_visit(self, node):
         raise UnparsableException(node, 'Could not parse node {}({})'.format(node, node.__dict__))
@@ -189,15 +203,75 @@ class _ExpressionVisitor(ast.NodeVisitor):
         else:
             self._stack.append(b / a)
 
+    # noinspection PyPep8Naming, PyUnusedLocal
+    @_log
+    def visit_Call(self, n: ast.Call):
+        function_name = n.func.id
+        if function_name not in self._known_functions:
+            raise UnparsableException(n, 'Unknown function {}'.format(function_name))
+        fun = self._known_functions[function_name]
+        for arg in n.args:
+            self.visit(arg)
+        self._stack.append(
+            fun(*[self._stack.pop() for _ in range(len(n.args))][::-1])
+        )
+
     @property
     def value(self):
         return self._stack[0] if self._stack else None
 
 
-def parse(context: typing.Dict, expr: str, context_name: str='context') -> typing.Any:
-    visitor = _ExpressionVisitor(context, context_name=context_name)
+def _parse(expr: str, visitor: ValueVisitor) -> typing.Any:
     visitor.visit(ast.parse(expr))
     return visitor.value
 
 
-__all__ = ['parse', 'VISITOR_LOGGER']
+def parse(context: typing.Dict, expr: str, context_name: str=_DEFAULT_CONTEXT_NAME) -> typing.Any:
+    return _parse(expr, _ExpressionVisitor(context, context_name=context_name))
+
+
+class VisitorBuilder(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def set_context_name(self, context_name: str) -> None:
+        pass  # pragma: no cover
+
+    @abc.abstractmethod
+    def add_function(self, function: typing.Callable, name: str = None) -> None:
+        pass  # pragma: no cover
+
+    @abc.abstractmethod
+    def set_context(self, context: typing.Dict) -> None:
+        pass  # pragma: no cover
+
+
+class _VisitorBuilder(VisitorBuilder):
+    def __init__(self):
+        self._context_name = _DEFAULT_CONTEXT_NAME
+        self._recorded_functions = {}
+        self._context = {}
+
+    def set_context_name(self, context_name: str) -> None:
+        self._context_name = context_name
+
+    def add_function(self, function: typing.Callable, name: str=None) -> None:
+        self._recorded_functions[name or function.__name__] = function
+
+    def set_context(self, context: typing.Dict) -> None:
+        self._context = context
+
+    def build(self) -> ValueVisitor:
+        visitor = _ExpressionVisitor(self._context, context_name=self._context_name)
+        for name, fun in self._recorded_functions.items():
+            visitor.add_known_function(name, fun)
+        return visitor
+
+
+def create_visitor_builder() -> VisitorBuilder:
+    return _VisitorBuilder()
+
+
+def parse_from_builder(expr: str, builder: VisitorBuilder) -> typing.Any:
+    # noinspection PyUnresolvedReferences
+    return _parse(expr, builder.build())
+
+__all__ = ['parse', 'parse_from_builder', 'create_visitor_builder', 'VISITOR_LOGGER', 'VisitorBuilder']
