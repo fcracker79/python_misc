@@ -12,7 +12,8 @@ class TestExpressionParser(unittest.TestCase):
                 'c': 2,
             },
             'd': 'hello',
-            'e': 3
+            'e': 3,
+            'f': 2.0
         }
 
     def _assert_expression(self, expected_value: typing.Any, expression: str):
@@ -32,3 +33,28 @@ class TestExpressionParser(unittest.TestCase):
     def test_mul(self):
         self._assert_expression(6, 'context.e * context.a.c')
         self._assert_expression('hellohellohello', 'context.d * context.e')
+
+    def test_div(self):
+        self._assert_expression(4, '9 / context.a.c')
+        self._assert_expression(4.5, '9.0 / context.a.c')
+        self._assert_expression(4.5, '9 / context.f')
+        self._assert_expression(4.5, '9.0 / context.f')
+
+    def test_and(self):
+        self._assert_expression(
+            1,
+            'context.a.b '
+            'if context.a.b + context.a.c == context.e '
+            'and context.e == context.a.b * 3 '
+            'and context.a.c / 2 == context.a.b else -1')
+
+        self._assert_expression(
+            -1,
+            'context.a.b '
+            'if context.a.b + context.a.c == context.e '
+            'and context.e == context.a.b * 3 '
+            'and context.a.c * 1000 == context.a.b else -1')
+
+    def test_or(self):
+        self._assert_expression(1, '1 if context.a.b == context.a.c or context.e == context.a.b * 3 else -1')
+        self._assert_expression(-1, '1 if context.a.b == context.a.c or context.e == context.a.b else -1')
