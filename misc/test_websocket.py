@@ -20,6 +20,10 @@ def on_open(ws):
     #     ws.close()
     #     print("thread terminating...")
     # thread.start_new_thread(run, ())
+    print('Sending ciao')
+    ws.send(b"Ciao")
+    print('Sending bytes')
+    ws.send(b'\xac\xed\x00\x05sr\x00)io.mirko.boundary.UserNotificationMessage\xd5\x1a\xa2\xdc\x9d\xafl$\x02\x00\x01L\x00\x04usert\x00\x16Lio/mirko/entity/User;xpsr\x00\x14io.mirko.entity.UserA^b<+\x199t\x02\x00\x02L\x00\tfirstNamet\x00\x12Ljava/lang/String;L\x00\x08lastNameq\x00~\x00\x04xpt\x00\x05Mirkot\x00\tBonasorte')
 
 
 if __name__ == "__main__":
