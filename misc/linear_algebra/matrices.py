@@ -97,3 +97,31 @@ class Matrix:
 
     def __repr__(self):
         return str(self)
+
+    def determinant(self):
+        if self.n == self.m == 1:
+            return self.item(0, 0)
+
+        result = 0.0
+
+        sign = 1.0
+        for c in range(self.m):
+            result += sign * self.item(0, c) * self.submatrix(0, c).determinant()
+            sign = -sign
+        return result
+
+    def submatrix(self, r: int, c: int) -> 'Matrix':
+        m = Matrix(self.n - 1, self.m - 1)
+
+        di = 0
+        for i in range(self.n):
+            if i == r:
+                di = 1
+                continue
+            dj = 0
+            for j in range(self.m):
+                if j == c:
+                    dj = 1
+                    continue
+                m.set_item(i - di, j - dj, self.item(i, j))
+        return m
