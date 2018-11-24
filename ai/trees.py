@@ -181,6 +181,7 @@ def _run_algos(add_costs: bool):
     g = _create_example_graph(add_costs=add_costs)
     _print_algo('BREADTH FIRST', g, 'Arad', 'Bucharest', _breadth_first)
     _print_algo('DEPTH FIRST', g, 'Arad', 'Bucharest', _depth_first)
+    _print_algo('UNIFORM COST', g, 'Arad', 'Bucharest', _uniform_cost)
 
 
 def _run():
