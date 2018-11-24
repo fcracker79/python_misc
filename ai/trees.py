@@ -11,43 +11,48 @@ class Graph:
         self.arch_count = 0
         self.nodes = set()
         self.archs = dict()  # type: typing.Dict[str, typing.Set[str]]
+        self.costs = dict()  # type: typing.Dict[str, int]
 
-    def add_arch(self, node1, node2):
+    def add_arch(self, node1, node2, cost: int=1):
         self.arch_count += 1
         self.nodes.add(node1)
         self.nodes.add(node2)
         self.archs.setdefault(node1, set()).add(node2)
         self.archs.setdefault(node2, set()).add(node1)
+        self.costs[','.join(sorted((node1, node2)))] = cost
+
+    def get_cost(self, node1: str, node2: str) -> int:
+        return self.costs[','.join(sorted((node1, node2)))]
 
     def get_children(self, node):
         return self.archs.get(node, [])
 
 
-def _create_example_graph() -> Graph:
+def _create_example_graph(add_costs: bool=False) -> Graph:
     g = Graph()
-    g.add_arch('Arad', 'Zerind')
-    g.add_arch('Arad', 'Timsoara')
-    g.add_arch('Arad', 'Sibiu')
-    g.add_arch('Zerind', 'Oradea')
-    g.add_arch('Oradea', 'Sibiu')
-    g.add_arch('Timsoara', 'Lugoj')
-    g.add_arch('Lugoj', 'Mehadia')
-    g.add_arch('Mehadia', 'Dobreta')
-    g.add_arch('Dobreta', 'Craovia')
-    g.add_arch('Craovia', 'Rimnicu Vilcea')
-    g.add_arch('Craovia', 'Pitesti')
-    g.add_arch('Rimnicu Vilcea', 'Sibiu')
-    g.add_arch('Rimnicu Vilcea', 'Pitesti')
-    g.add_arch('Sibiu', 'Faragas')
-    g.add_arch('Faragas', 'Bucharest')
-    g.add_arch('Pitesti', 'Bucharest')
-    g.add_arch('Bucharest', 'Giurgiu')
-    g.add_arch('Bucharest', 'Urziceni')
-    g.add_arch('Urziceni', 'Hisrova')
-    g.add_arch('Urziceni', 'Vaslui')
-    g.add_arch('Hisrova', 'Eforie')
-    g.add_arch('Vaslui', 'Iasi')
-    g.add_arch('Iasi', 'Neamt')
+    g.add_arch('Arad', 'Zerind', add_costs and 1 or 1)
+    g.add_arch('Arad', 'Timsoara', add_costs and 2 or 1)
+    g.add_arch('Arad', 'Sibiu', add_costs and 3 or 1)
+    g.add_arch('Zerind', 'Oradea', add_costs and 1 or 1)
+    g.add_arch('Oradea', 'Sibiu', add_costs and 4 or 1)
+    g.add_arch('Timsoara', 'Lugoj', add_costs and 2 or 1)
+    g.add_arch('Lugoj', 'Mehadia', add_costs and 1 or 1)
+    g.add_arch('Mehadia', 'Dobreta', add_costs and 1 or 1)
+    g.add_arch('Dobreta', 'Craovia', add_costs and 2 or 1)
+    g.add_arch('Craovia', 'Rimnicu Vilcea', add_costs and 3 or 1)
+    g.add_arch('Craovia', 'Pitesti', add_costs and 3 or 1)
+    g.add_arch('Rimnicu Vilcea', 'Sibiu', add_costs and 1 or 1)
+    g.add_arch('Rimnicu Vilcea', 'Pitesti', add_costs and 2 or 1)
+    g.add_arch('Sibiu', 'Faragas', add_costs and 2 or 1)
+    g.add_arch('Faragas', 'Bucharest', add_costs and 5 or 1)
+    g.add_arch('Pitesti', 'Bucharest', add_costs and 3 or 1)
+    g.add_arch('Bucharest', 'Giurgiu', add_costs and 2 or 1)
+    g.add_arch('Bucharest', 'Urziceni', add_costs and 1 or 1)
+    g.add_arch('Urziceni', 'Hisrova', add_costs and 2 or 1)
+    g.add_arch('Urziceni', 'Vaslui', add_costs and 4 or 1)
+    g.add_arch('Hisrova', 'Eforie', add_costs and 2 or 1)
+    g.add_arch('Vaslui', 'Iasi', add_costs and 2 or 1)
+    g.add_arch('Iasi', 'Neamt', add_costs and 2 or 1)
     return g
 
 
@@ -90,7 +95,7 @@ class SearchTree:
 
     def get_children(self, node: Node) -> typing.Iterable[Node]:
         return map(
-            lambda d: Node(d, node, node.depth + 1, node.cost + 1),
+            lambda d: Node(d, node, node.depth + 1, node.cost + self.graph.get_cost(node.state, d)),
             self.graph.get_children(node.state)
         )
 
@@ -109,7 +114,7 @@ class SearchTree:
             if node.state == self.goal:
                 if node.cost < best_score:
                     self.log(node)
-                    best_solution, best_score = path, node.cost
+                    best_solution, best_score = path + [node], node.cost
                     self.log(best_solution)
                 continue
             children = self.get_children(node)
@@ -140,14 +145,27 @@ def _depth_first(queue: typing.Deque[Node], nodes: typing.Sequence[Node]) -> typ
     )
 
 
+def _uniform_cost(queue: typing.Deque[Node], nodes: typing.Sequence[Node]) -> typing.Deque[Node]:
+    return collections.deque(sorted(itertools.chain(nodes, queue), key=lambda d: d.cost))
+
+
+_LENGTH = 80
+
+
 def _header(t: str):
-    print('********** {} **********'.format(t))
+    stars = '*' * ((_LENGTH - len(t) - 2) // 2)
+    final_stars = stars if len(stars) * 2 + 2 + len(t) == _LENGTH else stars + '*'
+    print(stars, t, final_stars, sep=' ')
+
+
+def _str_node(node: Node) -> str:
+    return 'Node(state={state}, depth={depth}, cost={cost})'.format(**node._asdict())
 
 
 def _print_solution(name: str, solution: typing.Optional[Solution]):
     _header(name)
     print('Score:', solution.score)
-    print('Best path:', solution.nodes)
+    print('Best path:', '\n\t'.join(map(_str_node, solution.nodes)))
 
 
 def _print_algo(name: str, graph: Graph, from_node: str, to_node: str, queuing_function: QueuingFunction):
@@ -158,10 +176,16 @@ def _print_algo(name: str, graph: Graph, from_node: str, to_node: str, queuing_f
     print('Elapsed time', stop - start)
 
 
-def _run():
-    g = _create_example_graph()
+def _run_algos(add_costs: bool):
+    _header('WITH COSTS' if add_costs else 'WITHOUT COSTS')
+    g = _create_example_graph(add_costs=add_costs)
     _print_algo('BREADTH FIRST', g, 'Arad', 'Bucharest', _breadth_first)
     _print_algo('DEPTH FIRST', g, 'Arad', 'Bucharest', _depth_first)
+
+
+def _run():
+    _run_algos(False)
+    _run_algos(True)
 
 
 if __name__ == '__main__':
