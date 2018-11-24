@@ -1,5 +1,6 @@
 import collections
 import itertools
+import sys
 import time
 import typing
 
@@ -94,26 +95,32 @@ class SearchTree:
         )
 
     def solve(self) -> typing.Optional[Solution]:
-        best_solution, best_score = None, -1
+        best_solution, best_score = None, sys.maxsize
         while self.nodes:
             node = self.nodes.pop()  # type: Node
-            self.log('Current path', node, list(self.get_parents(node))[::-1])
+            # Note:
+            # Without this simple optimization, depth-first and breadth-first compare well in terms of performances.
+            # With this optimization, depth-first is sligthly faster.
+            if node.cost > best_score:
+                continue
+            path = list(self.get_parents(node))[::-1]
+            self.log('Current path', node, path)
             self.log('Nodes', self.nodes)
             if node.state == self.goal:
-                if node.cost < best_score or best_score < 0:
+                if node.cost < best_score:
                     self.log(node)
-                    best_solution, best_score = list(self.get_parents(node))[::-1], node.cost
+                    best_solution, best_score = path, node.cost
                     self.log(best_solution)
                 continue
             children = self.get_children(node)
-            parent_states = set(map(lambda d: d.state, self.get_parents(node)))
+            parent_states = set(map(lambda d: d.state, path))
             self.log('children', node, children)
             children = list(filter(lambda d: d.state not in parent_states, children))
             self.log('children cleaned', children)
             self.nodes = self.queuing_function(self.nodes, children)
             node in self.nodes and self.nodes.remove(node)
 
-        return Solution(best_solution, best_score) if best_score > 0 else None
+        return Solution(best_solution, best_score) if best_solution else None
 
     @classmethod
     def get_parents(cls, node: Node):
@@ -145,7 +152,7 @@ def _print_solution(name: str, solution: typing.Optional[Solution]):
 
 def _print_algo(name: str, graph: Graph, from_node: str, to_node: str, queuing_function: QueuingFunction):
     start = time.time()
-    solution = SearchTree(graph, from_node, to_node, _breadth_first).solve()
+    solution = SearchTree(graph, from_node, to_node, queuing_function).solve()
     stop = time.time()
     _print_solution(name, solution)
     print('Elapsed time', stop - start)
